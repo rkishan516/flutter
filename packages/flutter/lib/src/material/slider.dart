@@ -18,6 +18,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart' show timeDilation;
 import 'package:flutter/services.dart';
+import 'package:flutter/src/material/slider_components.dart';
 
 import 'color_scheme.dart';
 import 'colors.dart';

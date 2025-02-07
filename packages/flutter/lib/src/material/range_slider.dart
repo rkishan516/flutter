@@ -21,6 +21,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart' show timeDilation;
+import 'package:flutter/src/material/range_slider_components.dart';
+import 'package:flutter/src/material/slider_components.dart';
 import 'package:flutter/widgets.dart';
 
 import 'constants.dart';
