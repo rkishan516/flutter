@@ -49,7 +49,7 @@ import 'theme.dart';
 ///    theme.
 ///  * [ThemeData], which describes the overall theme information for the
 ///    application.
-class ChipTheme extends InheritedTheme {
+class ChipTheme extends InheritedTheme<ChipThemeData, Object?> {
   /// Applies the given theme [data] to [child].
   const ChipTheme({super.key, required this.data, required super.child});
 
@@ -62,6 +62,9 @@ class ChipTheme extends InheritedTheme {
   ///
   /// Defaults to the ambient [ThemeData.chipTheme] if there is no
   /// [ChipTheme] in the given build context.
+  ///
+  /// If you're only interested in specific theme properties, consider using [select] instead,
+  /// which will only rebuild your widget when the selected property changes.
   ///
   /// {@tool snippet}
   ///
@@ -92,6 +95,20 @@ class ChipTheme extends InheritedTheme {
     return inheritedTheme?.data ?? Theme.of(context).chipTheme;
   }
 
+  /// Evaluates [ThemeSelector.select] using [data] provided by the
+  /// nearest ancestor [ChipTheme] widget, and returns the result.
+  ///
+  /// When this value changes, a notification is sent to the [context]
+  /// to trigger an update.
+  static T select<T>(BuildContext context, T Function(ChipThemeData) selector) {
+    final ThemeSelector<ChipThemeData, T> themeSelector = ThemeSelector<ChipThemeData, T>.from(
+      selector,
+    );
+    final ChipThemeData theme =
+        InheritedModel.inheritFrom<ChipTheme>(context, aspect: themeSelector)!.data;
+    return themeSelector.select(theme);
+  }
+
   @override
   Widget wrap(BuildContext context, Widget child) {
     return ChipTheme(data: data, child: child);
@@ -99,6 +116,21 @@ class ChipTheme extends InheritedTheme {
 
   @override
   bool updateShouldNotify(ChipTheme oldWidget) => data != oldWidget.data;
+
+  @override
+  bool updateShouldNotifyDependent(
+    ChipTheme oldWidget,
+    Set<ThemeSelector<ChipThemeData, Object?>> dependencies,
+  ) {
+    for (final ThemeSelector<ChipThemeData, Object?> selector in dependencies) {
+      final Object? oldValue = selector.select(oldWidget.data);
+      final Object? newValue = selector.select(data);
+      if (oldValue != newValue) {
+        return true;
+      }
+    }
+    return false;
+  }
 }
 
 /// Holds the color, shape, and text styles for a Material Design chip theme.

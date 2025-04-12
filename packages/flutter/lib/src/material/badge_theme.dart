@@ -163,7 +163,7 @@ class BadgeThemeData with Diagnosticable {
 ///
 /// Values specified here override the defaults for [Badge] properties which
 /// are not given an explicit non-null value.
-class BadgeTheme extends InheritedTheme {
+class BadgeTheme extends InheritedTheme<BadgeThemeData, Object?> {
   /// Creates a theme that overrides the default color parameters for [Badge]s
   /// in this widget's subtree.
   const BadgeTheme({super.key, required this.data, required super.child});
@@ -186,6 +186,29 @@ class BadgeTheme extends InheritedTheme {
     return badgeTheme?.data ?? Theme.of(context).badgeTheme;
   }
 
+  /// Evaluates [ThemeSelector.select] using [data] provided by the
+  /// nearest ancestor [BadgeTheme] widget, and returns the result.
+  ///
+  /// When this value changes, a notification is sent to the [context]
+  /// to trigger an update.
+  ///
+  /// If you're only interested in specific theme properties, consider using [select] instead,
+  /// which will only rebuild your widget when the selected property changes:
+  /// ```dart
+  /// final Color? backgroundColor = BadgeTheme.select(
+  ///   context,
+  ///   (BadgeThemeData data) => data.backgroundColor,
+  /// );
+  /// ```
+  static T select<T>(BuildContext context, T Function(BadgeThemeData) selector) {
+    final ThemeSelector<BadgeThemeData, T> themeSelector = ThemeSelector<BadgeThemeData, T>.from(
+      selector,
+    );
+    final BadgeThemeData theme =
+        InheritedModel.inheritFrom<BadgeTheme>(context, aspect: themeSelector)!.data;
+    return themeSelector.select(theme);
+  }
+
   @override
   Widget wrap(BuildContext context, Widget child) {
     return BadgeTheme(data: data, child: child);
@@ -193,4 +216,19 @@ class BadgeTheme extends InheritedTheme {
 
   @override
   bool updateShouldNotify(BadgeTheme oldWidget) => data != oldWidget.data;
+
+  @override
+  bool updateShouldNotifyDependent(
+    BadgeTheme oldWidget,
+    Set<ThemeSelector<BadgeThemeData, Object?>> dependencies,
+  ) {
+    for (final ThemeSelector<BadgeThemeData, Object?> selector in dependencies) {
+      final Object? oldValue = selector.select(oldWidget.data);
+      final Object? newValue = selector.select(data);
+      if (oldValue != newValue) {
+        return true;
+      }
+    }
+    return false;
+  }
 }

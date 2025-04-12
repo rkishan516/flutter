@@ -28,7 +28,7 @@ import 'theme.dart';
 ///  * [ThemeData], which describes the overall theme information for the
 ///    application.
 @immutable
-class DialogTheme extends InheritedTheme with Diagnosticable {
+class DialogTheme extends InheritedTheme<DialogThemeData, Object?> with Diagnosticable {
   /// Creates a dialog theme that can be used for [ThemeData.dialogTheme].
   const DialogTheme({
     super.key,
@@ -193,9 +193,26 @@ class DialogTheme extends InheritedTheme with Diagnosticable {
   }
 
   /// The [ThemeData.dialogTheme] property of the ambient [Theme].
+  ///
+  /// If you're only interested in specific theme properties, consider using [select] instead,
+  /// which will only rebuild your widget when the selected property changes.
   static DialogThemeData of(BuildContext context) {
     final DialogTheme? dialogTheme = context.dependOnInheritedWidgetOfExactType<DialogTheme>();
     return dialogTheme?.data ?? Theme.of(context).dialogTheme;
+  }
+
+  /// Evaluates [ThemeSelector.select] using [data] provided by the
+  /// nearest ancestor [DialogTheme] widget, and returns the result.
+  ///
+  /// When this value changes, a notification is sent to the [context]
+  /// to trigger an update.
+  static T select<T>(BuildContext context, T Function(DialogThemeData) selector) {
+    final ThemeSelector<DialogThemeData, T> themeSelector = ThemeSelector<DialogThemeData, T>.from(
+      selector,
+    );
+    final DialogThemeData theme =
+        InheritedModel.inheritFrom<DialogTheme>(context, aspect: themeSelector)!.data;
+    return themeSelector.select(theme);
   }
 
   @override
@@ -296,6 +313,21 @@ class DialogTheme extends InheritedTheme with Diagnosticable {
       DiagnosticsProperty<EdgeInsets>('insetPadding', insetPadding, defaultValue: null),
     );
     properties.add(DiagnosticsProperty<Clip>('clipBehavior', clipBehavior, defaultValue: null));
+  }
+
+  @override
+  bool updateShouldNotifyDependent(
+    DialogTheme oldWidget,
+    Set<ThemeSelector<DialogThemeData, Object?>> dependencies,
+  ) {
+    for (final ThemeSelector<DialogThemeData, Object?> selector in dependencies) {
+      final Object? oldValue = selector.select(oldWidget.data);
+      final Object? newValue = selector.select(data);
+      if (oldValue != newValue) {
+        return true;
+      }
+    }
+    return false;
   }
 }
 

@@ -245,7 +245,7 @@ class SearchViewThemeData with Diagnosticable {
 ///
 ///  * [SearchViewThemeData], which describes the actual configuration of a search view
 ///    theme.
-class SearchViewTheme extends InheritedTheme {
+class SearchViewTheme extends InheritedTheme<SearchViewThemeData, Object?> {
   /// Creates a const theme that controls the configurations for the search view
   /// created by the [SearchAnchor] widget.
   const SearchViewTheme({super.key, required this.data, required super.child});
@@ -255,6 +255,15 @@ class SearchViewTheme extends InheritedTheme {
 
   /// Returns the configuration [data] from the closest [SearchViewTheme] ancestor.
   /// If there is no ancestor, it returns [ThemeData.searchViewTheme].
+  ///
+  /// If you're only interested in specific theme properties, consider using [select] instead,
+  /// which will only rebuild your widget when the selected property changes:
+  /// ```dart
+  /// final Color? backgroundColor = SearchViewTheme.select(
+  ///   context,
+  ///   (SearchViewThemeData data) => data.backgroundColor,
+  /// );
+  /// ```
   ///
   /// Typical usage is as follows:
   ///
@@ -267,6 +276,19 @@ class SearchViewTheme extends InheritedTheme {
     return searchViewTheme?.data ?? Theme.of(context).searchViewTheme;
   }
 
+  /// Returns the value of the field specified by [selector] from the [SearchViewThemeData]
+  /// in the closest [SearchViewTheme] ancestor of the given [context].
+  ///
+  /// If there is no [SearchViewTheme] ancestor, or the theme data has no value for
+  /// the specified field, then the value from [ThemeData.searchViewTheme] is used.
+  static T select<T>(BuildContext context, T Function(SearchViewThemeData) selector) {
+    final ThemeSelector<SearchViewThemeData, T> themeSelector =
+        ThemeSelector<SearchViewThemeData, T>.from(selector);
+    final SearchViewThemeData theme =
+        InheritedModel.inheritFrom<SearchViewTheme>(context, aspect: themeSelector)!.data;
+    return themeSelector.select(theme);
+  }
+
   @override
   Widget wrap(BuildContext context, Widget child) {
     return SearchViewTheme(data: data, child: child);
@@ -274,4 +296,19 @@ class SearchViewTheme extends InheritedTheme {
 
   @override
   bool updateShouldNotify(SearchViewTheme oldWidget) => data != oldWidget.data;
+
+  @override
+  bool updateShouldNotifyDependent(
+    SearchViewTheme oldWidget,
+    Set<ThemeSelector<SearchViewThemeData, Object?>> dependencies,
+  ) {
+    for (final ThemeSelector<SearchViewThemeData, Object?> selector in dependencies) {
+      final Object? oldValue = selector.select(oldWidget.data);
+      final Object? newValue = selector.select(data);
+      if (oldValue != newValue) {
+        return true;
+      }
+    }
+    return false;
+  }
 }

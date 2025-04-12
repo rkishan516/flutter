@@ -916,7 +916,7 @@ class DatePickerThemeData with Diagnosticable {
 ///
 /// Values specified here are used for [DatePickerDialog] properties that are not
 /// given an explicit non-null value.
-class DatePickerTheme extends InheritedTheme {
+class DatePickerTheme extends InheritedTheme<DatePickerThemeData, Object?> {
   /// Creates a [DatePickerTheme] that controls visual parameters for
   /// descendent [DatePickerDialog]s.
   const DatePickerTheme({super.key, required this.data, required super.child});
@@ -930,6 +930,15 @@ class DatePickerTheme extends InheritedTheme {
   ///
   /// If there is no [DatePickerTheme] in scope, this will return
   /// [ThemeData.datePickerTheme] from the ambient [Theme].
+  ///
+  /// If you're only interested in specific theme properties, consider using [select] instead,
+  /// which will only rebuild your widget when the selected property changes:
+  /// ```dart
+  /// final Color? backgroundColor = DatePickerTheme.select(
+  ///   context,
+  ///   (DatePickerThemeData data) => data.backgroundColor,
+  /// );
+  /// ```
   ///
   /// Typical usage is as follows:
   ///
@@ -994,6 +1003,19 @@ class DatePickerTheme extends InheritedTheme {
         : _DatePickerDefaultsM2(context);
   }
 
+  /// Evaluates [ThemeSelector.select] using [data] provided by the
+  /// nearest ancestor [DatePickerTheme] widget, and returns the result.
+  ///
+  /// When this value changes, a notification is sent to the [context]
+  /// to trigger an update.
+  static T select<T>(BuildContext context, T Function(DatePickerThemeData) selector) {
+    final ThemeSelector<DatePickerThemeData, T> themeSelector =
+        ThemeSelector<DatePickerThemeData, T>.from(selector);
+    final DatePickerThemeData theme =
+        InheritedModel.inheritFrom<DatePickerTheme>(context, aspect: themeSelector)!.data;
+    return themeSelector.select(theme);
+  }
+
   @override
   Widget wrap(BuildContext context, Widget child) {
     return DatePickerTheme(data: data, child: child);
@@ -1001,6 +1023,21 @@ class DatePickerTheme extends InheritedTheme {
 
   @override
   bool updateShouldNotify(DatePickerTheme oldWidget) => data != oldWidget.data;
+
+  @override
+  bool updateShouldNotifyDependent(
+    DatePickerTheme oldWidget,
+    Set<ThemeSelector<DatePickerThemeData, Object?>> dependencies,
+  ) {
+    for (final ThemeSelector<DatePickerThemeData, Object?> selector in dependencies) {
+      final Object? oldValue = selector.select(oldWidget.data);
+      final Object? newValue = selector.select(data);
+      if (oldValue != newValue) {
+        return true;
+      }
+    }
+    return false;
+  }
 }
 
 // Hand coded defaults based on Material Design 2.

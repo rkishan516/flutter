@@ -78,7 +78,7 @@ enum ButtonBarLayoutBehavior {
 ///
 ///  * [RawMaterialButton], which can be used to configure a button that doesn't
 ///    depend on any inherited themes.
-class ButtonTheme extends InheritedTheme {
+class ButtonTheme extends InheritedTheme<ButtonThemeData, Object?> {
   /// Creates a button theme.
   ButtonTheme({
     super.key,
@@ -126,6 +126,14 @@ class ButtonTheme extends InheritedTheme {
 
   /// The closest instance of this class that encloses the given context.
   ///
+  /// If you're only interested in specific theme properties, consider using [select] instead,
+  /// which will only rebuild your widget when the selected property changes:
+  /// ```dart
+  /// final double height = ButtonTheme.select(
+  ///   context, (ButtonThemeData data) => data.height,
+  /// );
+  /// ```
+  ///
   /// Typical usage is as follows:
   ///
   /// ```dart
@@ -149,6 +157,20 @@ class ButtonTheme extends InheritedTheme {
     return buttonTheme!;
   }
 
+  /// Evaluates [ThemeSelector.select] using [data] provided by the
+  /// nearest ancestor [ButtonTheme] widget, and returns the result.
+  ///
+  /// When this value changes, a notification is sent to the [context]
+  /// to trigger an update.
+  static T select<T>(BuildContext context, T Function(ButtonThemeData) selector) {
+    final ThemeSelector<ButtonThemeData, T> themeSelector = ThemeSelector<ButtonThemeData, T>.from(
+      selector,
+    );
+    final ButtonThemeData theme =
+        InheritedModel.inheritFrom<ButtonTheme>(context, aspect: themeSelector)!.data;
+    return themeSelector.select(theme);
+  }
+
   @override
   Widget wrap(BuildContext context, Widget child) {
     return ButtonTheme.fromButtonThemeData(data: data, child: child);
@@ -156,6 +178,21 @@ class ButtonTheme extends InheritedTheme {
 
   @override
   bool updateShouldNotify(ButtonTheme oldWidget) => data != oldWidget.data;
+
+  @override
+  bool updateShouldNotifyDependent(
+    ButtonTheme oldWidget,
+    Set<ThemeSelector<ButtonThemeData, Object?>> dependencies,
+  ) {
+    for (final ThemeSelector<ButtonThemeData, Object?> selector in dependencies) {
+      final Object? oldValue = selector.select(oldWidget.data);
+      final Object? newValue = selector.select(data);
+      if (oldValue != newValue) {
+        return true;
+      }
+    }
+    return false;
+  }
 }
 
 /// Used with [ButtonTheme] to configure the color and geometry of buttons.

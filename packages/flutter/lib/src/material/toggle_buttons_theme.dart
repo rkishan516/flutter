@@ -255,7 +255,7 @@ class ToggleButtonsThemeData with Diagnosticable {
 ///
 /// Values specified here are used for [ToggleButtons] properties that are not
 /// given an explicit non-null value.
-class ToggleButtonsTheme extends InheritedTheme {
+class ToggleButtonsTheme extends InheritedTheme<ToggleButtonsThemeData, Object?> {
   /// Creates a toggle buttons theme that controls the color and border
   /// parameters for [ToggleButtons].
   const ToggleButtonsTheme({super.key, required this.data, required super.child});
@@ -268,6 +268,15 @@ class ToggleButtonsTheme extends InheritedTheme {
   /// If there is no enclosing [ToggleButtonsTheme] widget, then
   /// [ThemeData.toggleButtonsTheme] is used.
   ///
+  /// If you're only interested in specific theme properties, consider using [select] instead,
+  /// which will only rebuild your widget when the selected property changes:
+  /// ```dart
+  /// final Color? color = ToggleButtonsTheme.select(
+  ///   context,
+  ///   (ToggleButtonsThemeData data) => data.color,
+  /// );
+  /// ```
+  ///
   /// Typical usage is as follows:
   ///
   /// ```dart
@@ -279,6 +288,19 @@ class ToggleButtonsTheme extends InheritedTheme {
     return toggleButtonsTheme?.data ?? Theme.of(context).toggleButtonsTheme;
   }
 
+  /// Evaluates [ThemeSelector.select] using [data] provided by the
+  /// nearest ancestor [ToggleButtonsTheme] widget, and returns the result.
+  ///
+  /// When this value changes, a notification is sent to the [context]
+  /// to trigger an update.
+  static T select<T>(BuildContext context, T Function(ToggleButtonsThemeData) selector) {
+    final ThemeSelector<ToggleButtonsThemeData, T> themeSelector =
+        ThemeSelector<ToggleButtonsThemeData, T>.from(selector);
+    final ToggleButtonsThemeData theme =
+        InheritedModel.inheritFrom<ToggleButtonsTheme>(context, aspect: themeSelector)!.data;
+    return themeSelector.select(theme);
+  }
+
   @override
   Widget wrap(BuildContext context, Widget child) {
     return ToggleButtonsTheme(data: data, child: child);
@@ -286,4 +308,19 @@ class ToggleButtonsTheme extends InheritedTheme {
 
   @override
   bool updateShouldNotify(ToggleButtonsTheme oldWidget) => data != oldWidget.data;
+
+  @override
+  bool updateShouldNotifyDependent(
+    ToggleButtonsTheme oldWidget,
+    Set<ThemeSelector<ToggleButtonsThemeData, Object?>> dependencies,
+  ) {
+    for (final ThemeSelector<ToggleButtonsThemeData, Object?> selector in dependencies) {
+      final Object? oldValue = selector.select(oldWidget.data);
+      final Object? newValue = selector.select(data);
+      if (oldValue != newValue) {
+        return true;
+      }
+    }
+    return false;
+  }
 }
