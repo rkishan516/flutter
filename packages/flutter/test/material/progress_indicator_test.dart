@@ -13,7 +13,7 @@
 @Tags(<String>['reduced-test-set', 'no-shuffle'])
 library;
 
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1226,7 +1226,9 @@ void main() {
 
   testWidgets('Material3 - Default size of CircularProgressIndicator', (WidgetTester tester) async {
     await tester.pumpWidget(
-      const MaterialApp(home: Scaffold(body: Material(child: CircularProgressIndicator()))),
+      const MaterialApp(
+        home: Scaffold(body: Material(child: CircularProgressIndicator(year2023: false))),
+      ),
     );
 
     expect(tester.getSize(find.byType(CircularProgressIndicator)), const Size(36, 36));
