@@ -242,6 +242,7 @@ FlutterWindowsEngine::FlutterWindowsEngine(
 
 FlutterWindowsEngine::~FlutterWindowsEngine() {
   messenger_->SetEngine(nullptr);
+  host_window_controller_.reset();
   Stop();
 }
 
