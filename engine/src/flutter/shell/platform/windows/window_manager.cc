@@ -57,6 +57,20 @@ FlutterViewId WindowManager::CreateDialogWindow(
   return view_id;
 }
 
+FlutterViewId WindowManager::CreateOverlayWindow(
+    const OverlayWindowCreationRequest* request) {
+  auto window = HostWindow::CreateOverlayWindow(
+      this, engine_, request->content_size, request->parent_window,
+      request->initial_x, request->initial_y, request->always_on_top);
+  if (!window || !window->GetWindowHandle()) {
+    FML_LOG(ERROR) << "Failed to create overlay host window";
+    return -1;
+  }
+  FlutterViewId const view_id = window->view_controller_->view()->view_id();
+  active_windows_[window->GetWindowHandle()] = std::move(window);
+  return view_id;
+}
+
 void WindowManager::OnEngineShutdown() {
   // Don't send any more messages to isolate.
   on_message_ = nullptr;
@@ -140,6 +154,33 @@ FlutterViewId InternalFlutterWindows_WindowManager_CreateDialogWindow(
   flutter::FlutterWindowsEngine* engine =
       flutter::FlutterWindowsEngine::GetEngineForId(engine_id);
   return engine->window_manager()->CreateDialogWindow(request);
+}
+
+FlutterViewId InternalFlutterWindows_WindowManager_CreateOverlayWindow(
+    int64_t engine_id,
+    const flutter::OverlayWindowCreationRequest* request) {
+  flutter::FlutterWindowsEngine* engine =
+      flutter::FlutterWindowsEngine::GetEngineForId(engine_id);
+  return engine->window_manager()->CreateOverlayWindow(request);
+}
+
+void InternalFlutterWindows_WindowManager_SetWindowPosition(HWND window_handle,
+                                                            double x,
+                                                            double y) {
+  if (window_handle) {
+    SetWindowPos(window_handle, nullptr, static_cast<int>(x),
+                 static_cast<int>(y), 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+  }
+}
+
+void InternalFlutterWindows_WindowManager_SetWindowAlwaysOnTop(
+    HWND window_handle,
+    bool always_on_top) {
+  if (window_handle) {
+    HWND insert_after = always_on_top ? HWND_TOPMOST : HWND_NOTOPMOST;
+    SetWindowPos(window_handle, insert_after, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE);
+  }
 }
 
 HWND InternalFlutterWindows_WindowManager_GetTopLevelWindowHandle(

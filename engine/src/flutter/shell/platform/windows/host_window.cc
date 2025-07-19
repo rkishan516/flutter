@@ -4,6 +4,7 @@
 
 #include "flutter/shell/platform/windows/host_window.h"
 #include "flutter/shell/platform/windows/host_window_dialog.h"
+#include "flutter/shell/platform/windows/host_window_overlay.h"
 #include "flutter/shell/platform/windows/host_window_regular.h"
 
 #include <dwmapi.h>
@@ -159,6 +160,19 @@ std::unique_ptr<HostWindow> HostWindow::CreateDialogWindow(
     HWND owner_window) {
   return std::unique_ptr<HostWindow>(
       new HostWindowDialog(window_manager, engine, content_size, owner_window));
+}
+
+std::unique_ptr<HostWindow> HostWindow::CreateOverlayWindow(
+    WindowManager* window_manager,
+    FlutterWindowsEngine* engine,
+    const WindowSizing& content_size,
+    HWND parent_window,
+    double initial_x,
+    double initial_y,
+    bool always_on_top) {
+  return std::unique_ptr<HostWindow>(
+      new HostWindowOverlay(window_manager, engine, content_size, parent_window,
+                            initial_x, initial_y, always_on_top));
 }
 
 HostWindow::HostWindow(WindowManager* window_manager,

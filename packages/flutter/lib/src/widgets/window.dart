@@ -24,6 +24,9 @@ enum WindowArchetype {
 
   /// Defines a tooltip window
   tooltip,
+
+  /// Defines an overlay window
+  overlay,
 }
 
 /// Defines sizing request for a window.
@@ -110,11 +113,101 @@ abstract class TooltipWindowController extends WindowController {
   WindowArchetype get type => WindowArchetype.tooltip;
 }
 
+/// A controller for an overlay window.
+///
+/// An overlay window is a frameless, floating window that automatically adjusts
+/// size based on content dimensions and appears above other windows. Unlike
+/// existing archetypes, overlay windows can have parent-child relationships and
+/// persist independently while maintaining always-on-top behavior as optional
+/// behavior.
+///
+/// This class does not interact with the widget tree. Instead, it is typically
+/// provided to the [OverlayWindow] widget, which renders the content inside the
+/// overlay window.
+///
+/// An example usage might look like:
+/// ```dart
+/// final OverlayWindowController controller = OverlayWindowController(
+///   initialPosition: const Offset(100, 100),
+///   alwaysOnTop: true,
+/// );
+/// runApp(OverlayWindow(
+///   controller: controller,
+///   child: Container(
+///     padding: const EdgeInsets.all(16),
+///     child: const Text('Overlay Content'),
+///   ),
+/// ));
+/// ```
+///
+/// When provided to an [OverlayWindow] widget, widgets inside of the [child]
+/// parameter will have access to the [OverlayWindowController] via the
+/// [WindowControllerContext] widget.
+abstract class OverlayWindowController extends WindowController {
+  /// Creates an [OverlayWindowController] with the provided properties.
+  /// Upon construction, the overlay window is created for the platform.
+  ///
+  /// [parent] optional parent view for the overlay window.
+  /// [anchorRect] rectangle used as reference for positioning the overlay.
+  /// [positioner] handles intelligent positioning of the overlay window.
+  /// [contentSizeConstraints] constraints for the window content size.
+  /// [delegate] optional delegate for the controller.
+  /// [alwaysOnTop] whether the overlay window should stay on top of other windows.
+  factory OverlayWindowController({
+    FlutterView? parent,
+    required Rect anchorRect,
+    required WindowPositioner positioner,
+    BoxConstraints? contentSizeConstraints,
+    OverlayWindowControllerDelegate? delegate,
+    bool alwaysOnTop = false,
+  }) {
+    WidgetsFlutterBinding.ensureInitialized();
+    final WindowingOwner owner = WidgetsBinding.instance.windowingOwner;
+    final OverlayWindowController controller = owner.createOverlayWindowController(
+      parent: parent,
+      anchorRect: anchorRect,
+      positioner: positioner,
+      contentSizeConstraints: contentSizeConstraints ?? const BoxConstraints(),
+      delegate: delegate ?? OverlayWindowControllerDelegate(),
+      alwaysOnTop: alwaysOnTop,
+    );
+    return controller;
+  }
+
+  @protected
+  /// Creates an empty [OverlayWindowController].
+  OverlayWindowController.empty();
+
+  @override
+  WindowArchetype get type => WindowArchetype.overlay;
+
+  /// Whether the overlay window is always on top of other windows.
+  bool get alwaysOnTop;
+
+  /// Sets whether the overlay window should be always on top of other windows.
+  void setAlwaysOnTop(bool alwaysOnTop);
+
+  /// The parent view of the overlay window, if any.
+  FlutterView? get parent;
+}
+
 mixin class TooltipWindowControllerDelegate {
   /// Invoked when user attempts to close the window. Default implementation
   /// destroys the window. Subclass can override the behavior to delay
   /// or prevent the window from closing.
   void onWindowCloseRequested(TooltipWindowController controller) {
+    controller.destroy();
+  }
+
+  void onWindowDestroyed() {}
+}
+
+/// Delegate class for overlay window controller.
+mixin class OverlayWindowControllerDelegate {
+  /// Invoked when user attempts to close the window. Default implementation
+  /// destroys the window. Subclass can override the behavior to delay
+  /// or prevent the window from closing.
+  void onWindowCloseRequested(OverlayWindowController controller) {
     controller.destroy();
   }
 
@@ -368,6 +461,16 @@ abstract class WindowingOwner {
     required FlutterView parent,
   });
 
+  /// Creates an [OverlayWindowController] with the provided properties.
+  OverlayWindowController createOverlayWindowController({
+    required BoxConstraints contentSizeConstraints,
+    required OverlayWindowControllerDelegate delegate,
+    required Rect anchorRect,
+    required WindowPositioner positioner,
+    FlutterView? parent,
+    bool alwaysOnTop = false,
+  });
+
   /// Returns whether application has any top level windows created by this
   /// windowing owner.
   bool hasTopLevelWindows();
@@ -410,6 +513,21 @@ class _FallbackWindowingOwner extends WindowingOwner {
     required FlutterView parent,
     required Rect anchorRect,
     required WindowPositioner positioner,
+  }) {
+    throw UnsupportedError(
+      'Current platform does not support windowing.\n'
+      'Implement a WindowingDelegate for this platform.',
+    );
+  }
+
+  @override
+  OverlayWindowController createOverlayWindowController({
+    required BoxConstraints contentSizeConstraints,
+    required OverlayWindowControllerDelegate delegate,
+    required Rect anchorRect,
+    required WindowPositioner positioner,
+    FlutterView? parent,
+    bool alwaysOnTop = false,
   }) {
     throw UnsupportedError(
       'Current platform does not support windowing.\n'
@@ -560,6 +678,67 @@ class TooltipWindow extends StatefulWidget {
 }
 
 class _TooltipWindowState extends State<TooltipWindow> {
+  @override
+  void dispose() {
+    super.dispose();
+    widget.controller.destroy();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return View(
+      view: widget.controller.rootView,
+      child: WindowControllerContext(controller: widget.controller, child: widget.child),
+    );
+  }
+}
+
+/// The [OverlayWindow] widget provides a way to render an overlay window in the
+/// widget tree. The provided [controller] creates the native window that backs
+/// the widget. The [child] widget is rendered into this newly created window.
+///
+/// While the window is being created, the [OverlayWindow] widget will render
+/// an empty [ViewCollection] widget. Once the window is created, the [child]
+/// widget will be rendered into the window inside of a [View].
+///
+/// An example usage might look like:
+/// ```dart
+/// final OverlayWindowController controller = OverlayWindowController(
+///   initialPosition: const Offset(100, 100),
+///   alwaysOnTop: true,
+/// );
+/// runApp(OverlayWindow(
+///   controller: controller,
+///   child: Container(
+///     padding: const EdgeInsets.all(16),
+///     child: const Text('Overlay Content'),
+///   ),
+/// ));
+/// ```
+///
+/// When an [OverlayWindow] widget is removed from the tree, the window that was created
+/// by the [controller] is automatically destroyed if it has not yet been destroyed.
+///
+/// Widgets in the same tree as the [child] widget will have access to the
+/// [OverlayWindowController] via the [WindowControllerContext] widget.
+class OverlayWindow extends StatefulWidget {
+  /// Creates an overlay window widget.
+  /// [controller] the controller for this window
+  /// [child] the content to render into this window
+  /// [key] the key for this widget
+  const OverlayWindow({super.key, required this.controller, required this.child});
+
+  /// Controller for this widget.
+  final OverlayWindowController controller;
+
+  /// The content rendered into this window.
+  final Widget child;
+
+  @override
+  State<OverlayWindow> createState() => _OverlayWindowState();
+}
+
+class _OverlayWindowState extends State<OverlayWindow> {
   @override
   void dispose() {
     super.dispose();
