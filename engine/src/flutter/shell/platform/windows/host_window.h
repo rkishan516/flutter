@@ -52,6 +52,21 @@ class HostWindow {
       const WindowSizing& content_size,
       HWND owner_window);
 
+  // Creates an overlay window. |window_manager| is a pointer to the window
+  // manager that manages the window. |engine| is a pointer to the engine that
+  // manages the window manager. |content_size| is the requested content size
+  // and constraints. |parent_window| is the optional handle to the parent
+  // window. |initial_x| and |initial_y| are the initial position coordinates.
+  // |always_on_top| determines if the window should stay above other windows.
+  static std::unique_ptr<HostWindow> CreateOverlayWindow(
+      WindowManager* window_manager,
+      FlutterWindowsEngine* engine,
+      const WindowSizing& content_size,
+      HWND parent_window,
+      double initial_x,
+      double initial_y,
+      bool always_on_top);
+
   // Returns the instance pointer for |hwnd| or nullptr if invalid.
   static HostWindow* GetThisFromHandle(HWND hwnd);
 

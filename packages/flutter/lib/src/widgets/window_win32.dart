@@ -78,6 +78,27 @@ class WindowingOwnerWin32 extends WindowingOwner {
     );
   }
 
+  @override
+  OverlayWindowController createOverlayWindowController({
+    required BoxConstraints contentSizeConstraints,
+    required OverlayWindowControllerDelegate delegate,
+    required Rect anchorRect,
+    required WindowPositioner positioner,
+    FlutterView? parent,
+    bool alwaysOnTop = false,
+  }) {
+    final OverlayWindowControllerWin32 res = OverlayWindowControllerWin32(
+      owner: this,
+      delegate: delegate,
+      contentSizeConstraints: contentSizeConstraints,
+      anchorRect: anchorRect,
+      positioner: positioner,
+      parent: parent,
+      alwaysOnTop: alwaysOnTop,
+    );
+    return res;
+  }
+
   /// Register new message handler. The handler will be called for unhandled
   /// messages for all top level windows.
   void addMessageHandler(WindowsMessageHandler handler) {
@@ -512,6 +533,129 @@ class DialogWindowControllerWin32 extends DialogWindowController implements Wind
   external static int _createWindow(int engineId, Pointer<_DialogWindowCreationRequest> request);
 }
 
+/// The Win32 implementation of the overlay window controller.
+class OverlayWindowControllerWin32 extends OverlayWindowController implements WindowsMessageHandler {
+  /// Creates a new overlay window controller for Win32. When this constructor
+  /// completes the FlutterView is created and framework is aware of it.
+  OverlayWindowControllerWin32({
+    required WindowingOwnerWin32 owner,
+    required OverlayWindowControllerDelegate delegate,
+    required BoxConstraints contentSizeConstraints,
+    required this.anchorRect,
+    required this.positioner,
+    FlutterView? parent,
+    bool alwaysOnTop = false,
+  }) : _owner = owner,
+       _delegate = delegate,
+       _alwaysOnTop = alwaysOnTop,
+       _parent = parent,
+       super.empty() {
+    final int engineId = PlatformDispatcher.instance.engineId!;
+    
+    // Find parent window handle if parent is provided
+    final _HwndWrapper? parentWindow = parent != null 
+        ? _HwndWrapper(hwnd: _HwndWrapper.getWindowHandle(engineId, parent.viewId))
+        : null;
+
+    // Use positioner to calculate initial position
+    // For simplicity, we'll use the top-left of anchor rect as initial position
+    // The positioner will be used for proper positioning once content size is known
+    final Offset initialPosition = anchorRect.topLeft;
+    
+    final Pointer<_OverlayWindowCreationRequest> request =
+        ffi.calloc<_OverlayWindowCreationRequest>()
+          ..ref.contentSize.set(WindowSizing(constraints: contentSizeConstraints))
+          ..ref.parentWindow = parentWindow?.hwnd ?? nullptr
+          ..ref.initialX = initialPosition.dx
+          ..ref.initialY = initialPosition.dy
+          ..ref.alwaysOnTop = alwaysOnTop;
+    
+    final int viewId = _createWindow(engineId, request);
+    ffi.calloc.free(request);
+    
+    final FlutterView flutterView = WidgetsBinding.instance.platformDispatcher.views.firstWhere(
+      (FlutterView view) => view.viewId == viewId,
+    );
+    setView(flutterView);
+    owner.addMessageHandler(this);
+    _hwnd = _HwndWrapper(hwnd: _HwndWrapper.getWindowHandle(engineId, viewId));
+  }
+
+  @override
+  Size get contentSize {
+    return _hwnd.contentSize();
+  }
+
+  @override
+  bool get destroyed => _hwnd._destroyed;
+
+  bool _alwaysOnTop;
+  final FlutterView? _parent;
+
+  final WindowPositioner positioner;
+  final Rect anchorRect;
+
+  @override
+  bool get alwaysOnTop => _alwaysOnTop;
+
+  @override
+  void setAlwaysOnTop(bool alwaysOnTop) {
+    if (_alwaysOnTop != alwaysOnTop) {
+      _alwaysOnTop = alwaysOnTop;
+      _setWindowAlwaysOnTop(_hwnd.hwnd, alwaysOnTop);
+      notifyListeners();
+    }
+  }
+
+  @override
+  FlutterView? get parent => _parent;
+
+  @override
+  void destroy() {
+    _owner.removeMessageHandler(this);
+    if (_hwnd.destroy()) {
+      _delegate.onWindowDestroyed();
+    }
+  }
+
+  @override
+  int? handleWindowsMessage(
+    FlutterView view,
+    Pointer<Void> windowHandle,
+    int message,
+    int wParam,
+    int lParam,
+  ) {
+    if (view == rootView) {
+      // Handle WM_CLOSE (0x0010)
+      if (message == 0x0010) {
+        _delegate.onWindowCloseRequested(this);
+        return 0; // Prevent default close handling
+      }
+      // Handle WM_MOVE (0x0003) for resize notifications
+      if (message == 0x0003) {
+        notifyListeners();
+      }
+    }
+    return null;
+  }
+
+  final OverlayWindowControllerDelegate _delegate;
+  final WindowingOwnerWin32 _owner;
+  late final _HwndWrapper _hwnd;
+
+  @Native<Int64 Function(Int64, Pointer<_OverlayWindowCreationRequest>)>(
+    symbol: 'InternalFlutterWindows_WindowManager_CreateOverlayWindow',
+  )
+  external static int _createWindow(int engineId, Pointer<_OverlayWindowCreationRequest> request);
+
+
+  @Native<Void Function(Pointer<Void>, Bool)>(
+    symbol: 'InternalFlutterWindows_WindowManager_SetWindowAlwaysOnTop',
+  )
+  external static void _setWindowAlwaysOnTop(Pointer<Void> windowHandle, bool alwaysOnTop);
+}
+
 /// Request to initialize windowing system.
 final class _WindowingInitRequest extends Struct {
   external Pointer<NativeFunction<Void Function(Pointer<_WindowsMessage>)>> onMessage;
@@ -572,6 +716,20 @@ final class _RegularWindowCreationRequest extends Struct {
 final class _DialogWindowCreationRequest extends Struct {
   external _Sizing contentSize;
   external Pointer<Void> parentWindow;
+}
+
+final class _OverlayWindowCreationRequest extends Struct {
+  external _Sizing contentSize;
+  external Pointer<Void> parentWindow;
+  
+  @Double()
+  external double initialX;
+  
+  @Double()
+  external double initialY;
+  
+  @Bool()
+  external bool alwaysOnTop;
 }
 
 /// Windows message received for all top level windows (regardless whether

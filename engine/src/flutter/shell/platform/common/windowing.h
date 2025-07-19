@@ -18,7 +18,10 @@ enum class WindowArchetype {
   kDialog,
 
   // Tooltip window.
-  kTooltip
+  kTooltip,
+
+  // Overlay window.
+  kOverlay
 };
 
 }  // namespace flutter

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'dialog_window_content.dart';
 import 'regular_window_content.dart';
 import 'tooltip_window_content.dart';
+import 'overlay_window_content.dart';
 import 'window_manager_model.dart';
 import 'window_settings.dart';
 
@@ -54,6 +55,14 @@ class WindowControllerRender extends StatelessWidget {
           controller: controller as TooltipWindowController,
           child: TooltipWindowContent(
             controller: controller as TooltipWindowController,
+          ),
+        );
+      case WindowArchetype.overlay:
+        return OverlayWindow(
+          key: key,
+          controller: controller as OverlayWindowController,
+          child: OverlayWindowContent(
+            controller: controller as OverlayWindowController,
           ),
         );
     }

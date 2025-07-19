@@ -57,6 +57,14 @@ struct DialogWindowCreationRequest {
   HWND parent_window;
 };
 
+struct OverlayWindowCreationRequest {
+  WindowSizing content_size;
+  HWND parent_window;
+  double initial_x;
+  double initial_y;
+  bool always_on_top;
+};
+
 // A manager class for managing |HostWindow| instances.
 // A unique instance of this class is owned by |FlutterWindowsEngine|.
 class WindowManager {
@@ -71,6 +79,8 @@ class WindowManager {
   FlutterViewId CreateRegularWindow(
       const RegularWindowCreationRequest* request);
   FlutterViewId CreateDialogWindow(const DialogWindowCreationRequest* request);
+  FlutterViewId CreateOverlayWindow(
+      const OverlayWindowCreationRequest* request);
 
   // Message handler called by |HostWindow::WndProc| to process window
   // messages before delegating them to the host window. This allows the
@@ -121,6 +131,21 @@ FLUTTER_EXPORT
 FlutterViewId InternalFlutterWindows_WindowManager_CreateDialogWindow(
     int64_t engine_id,
     const flutter::DialogWindowCreationRequest* request);
+
+FLUTTER_EXPORT
+FlutterViewId InternalFlutterWindows_WindowManager_CreateOverlayWindow(
+    int64_t engine_id,
+    const flutter::OverlayWindowCreationRequest* request);
+
+FLUTTER_EXPORT
+void InternalFlutterWindows_WindowManager_SetWindowPosition(HWND window_handle,
+                                                            double x,
+                                                            double y);
+
+FLUTTER_EXPORT
+void InternalFlutterWindows_WindowManager_SetWindowAlwaysOnTop(
+    HWND window_handle,
+    bool always_on_top);
 
 // Retrives the HWND associated with this |engine_id| and |view_id|. Returns
 // NULL if the HWND cannot be found

@@ -65,6 +65,27 @@ class WindowingOwnerMacOS extends WindowingOwner {
   }
 
   @override
+  OverlayWindowController createOverlayWindowController({
+    required BoxConstraints contentSizeConstraints,
+    required OverlayWindowControllerDelegate delegate,
+    required Rect anchorRect,
+    required WindowPositioner positioner,
+    FlutterView? parent,
+    bool alwaysOnTop = false,
+  }) {
+    final OverlayWindowControllerMacOS res = OverlayWindowControllerMacOS(
+      owner: this,
+      delegate: delegate,
+      contentSizeConstraints: contentSizeConstraints,
+      anchorRect: anchorRect,
+      positioner: positioner,
+      parent: parent,
+      alwaysOnTop: alwaysOnTop,
+    );
+    return res;
+  }
+
+  @override
   bool hasTopLevelWindows() {
     return _activeControllers.isNotEmpty;
   }
@@ -241,6 +262,103 @@ class TooltipWindowControllerMacOS extends TooltipWindowController with _WindowC
   }
 
   final TooltipWindowControllerDelegate _delegate;
+}
+
+/// The macOS implementation of the overlay window controller.
+class OverlayWindowControllerMacOS extends OverlayWindowController with _WindowControllerMixin {
+  OverlayWindowControllerMacOS({
+    required WindowingOwnerMacOS owner,
+    required OverlayWindowControllerDelegate delegate,
+    required BoxConstraints contentSizeConstraints,
+    required this.anchorRect,
+    required this.positioner,
+    FlutterView? parent,
+    bool alwaysOnTop = false,
+  }) : _delegate = delegate,
+       _alwaysOnTop = alwaysOnTop,
+       _parent = parent,
+       super.empty() {
+    _initController(owner);
+
+    final Pointer<_WindowCreationRequest> request =
+        ffi.calloc<_WindowCreationRequest>()
+          ..ref.contentSize.set(WindowSizing(constraints: contentSizeConstraints))
+          ..ref.onShouldClose = _onShouldClose.nativeFunction
+          ..ref.onWillClose = _onWillClose.nativeFunction
+          ..ref.onSizeChange = _onResize.nativeFunction
+          ..ref.onGetWindowPosition = _onGetWindowPosition.nativeFunction;
+
+    if (parent != null) {
+      request.ref.parentViewId = parent.viewId;
+    }
+
+    final int viewId = _createOverlayWindow(PlatformDispatcher.instance.engineId!, request);
+    ffi.calloc.free(request);
+
+    final FlutterView flutterView = WidgetsBinding.instance.platformDispatcher.views.firstWhere(
+      (FlutterView view) => view.viewId == viewId,
+    );
+    setView(flutterView);
+  }
+
+  @override
+  void _handleOnShouldClose() {
+    _delegate.onWindowCloseRequested(this);
+  }
+
+  @override
+  void _handleOnWillClose() {
+    super._handleOnWillClose();
+    _delegate.onWindowDestroyed();
+  }
+
+  @override
+  void _handleOnResize() {
+    notifyListeners();
+  }
+
+  bool _alwaysOnTop;
+  final FlutterView? _parent;
+
+  @override
+  bool get alwaysOnTop => _alwaysOnTop;
+
+  @override
+  void setAlwaysOnTop(bool alwaysOnTop) {
+    if (_alwaysOnTop != alwaysOnTop) {
+      _alwaysOnTop = alwaysOnTop;
+      notifyListeners();
+    }
+  }
+
+  @override
+  FlutterView? get parent => _parent;
+
+  final WindowPositioner positioner;
+  final Rect anchorRect;
+
+  @override
+  Pointer<_Rect> _handleOnGetWindowPosition(
+    Pointer<_Size> childSize,
+    Pointer<_Rect> parentRect,
+    Pointer<_Rect> outputRect,
+  ) {
+    super._handleOnGetWindowPosition(childSize, parentRect, outputRect);
+    final Pointer<_Rect> result = ffi.calloc<_Rect>();
+    final Rect targetRect = positioner.placeWindow(
+      childSize: childSize.ref.toSize(),
+      anchorRect: anchorRect.translate(parentRect.ref.left, parentRect.ref.top),
+      parentRect: parentRect.ref.toRect(),
+      outputRect: outputRect.ref.toRect(),
+    );
+    result.ref.left = targetRect.left;
+    result.ref.top = targetRect.top;
+    result.ref.width = childSize.ref.width;
+    result.ref.height = childSize.ref.height;
+    return result;
+  }
+
+  final OverlayWindowControllerDelegate _delegate;
 }
 
 /// The macOS implementation of the regular window controller.
@@ -565,6 +683,11 @@ external int _createDialogWindow(int engineId, Pointer<_WindowCreationRequest> r
   symbol: 'InternalFlutter_WindowController_CreateTooltipWindow',
 )
 external int _createTooltipWindow(int engineId, Pointer<_WindowCreationRequest> request);
+
+@Native<Int64 Function(Int64, Pointer<_WindowCreationRequest>)>(
+  symbol: 'InternalFlutter_WindowController_CreateOverlayWindow',
+)
+external int _createOverlayWindow(int engineId, Pointer<_WindowCreationRequest> request);
 
 @Native<Void Function(Int64, Pointer<Void>)>(symbol: 'InternalFlutter_Window_Destroy')
 external void _destroyWindow(int engineId, Pointer<Void> handle);

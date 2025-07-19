@@ -342,6 +342,57 @@ static void FlipRect(NSRect& rect, const NSRect& globalScreenFrame) {
   return c.viewIdentifier;
 }
 
+- (FlutterViewIdentifier)createOverlayWindow:(const FlutterWindowCreationRequest*)request {
+  FlutterViewController* c = [[FlutterViewController alloc] initWithEngine:_engine
+                                                                   nibName:nil
+                                                                    bundle:nil];
+
+  NSPanel* window = [[NSPanel alloc] init];
+  // If this is not set there will be double free on window close when
+  // using ARC.
+  [window setReleasedWhenClosed:NO];
+
+  window.contentViewController = c;
+  window.styleMask = NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel;
+  window.hasShadow = NO;
+  window.opaque = NO;
+  window.backgroundColor = [NSColor clearColor];
+  window.level = NSFloatingWindowLevel;  // Always on top
+  window.collectionBehavior =
+      NSWindowCollectionBehaviorAuxiliary | NSWindowCollectionBehaviorIgnoresCycle;
+
+  FlutterWindowOwner* w = [[FlutterWindowOwner alloc] initWithWindow:window
+                                               flutterViewController:c
+                                                     creationRequest:*request];
+
+  c.flutterView.sizingDelegate = w;
+  [c.flutterView setBackgroundColor:[NSColor clearColor]];
+  // Resend configure event after setting the sizing delegate.
+  [c.flutterView constraintsDidChange];
+
+  window.delegate = w;
+  [_windows addObject:w];
+
+  NSWindow* parent = nil;
+
+  if (request->parent_id != 0) {
+    for (FlutterWindowOwner* owner in _windows) {
+      if (owner.flutterViewController.viewIdentifier == request->parent_id) {
+        parent = owner.window;
+        break;
+      }
+    }
+  }
+
+  if (parent != nil) {
+    [parent addChildWindow:window ordered:NSWindowAbove];
+  }
+
+  [window setIsVisible:YES];
+  window.alphaValue = 0.0;  // Initially hidden, will be shown after positioning
+  return c.viewIdentifier;
+}
+
 - (void)destroyWindow:(NSWindow*)window {
   FlutterWindowOwner* owner = nil;
   for (FlutterWindowOwner* o in _windows) {
@@ -404,6 +455,14 @@ int64_t InternalFlutter_WindowController_CreateRegularWindow(
   FlutterEngine* engine = [FlutterEngine engineForIdentifier:engine_id];
   [engine enableMultiView];
   return [engine.windowController createRegularWindow:request];
+}
+
+int64_t InternalFlutter_WindowController_CreateOverlayWindow(
+    int64_t engine_id,
+    const FlutterWindowCreationRequest* request) {
+  FlutterEngine* engine = [FlutterEngine engineForIdentifier:engine_id];
+  [engine enableMultiView];
+  return [engine.windowController createOverlayWindow:request];
 }
 
 void InternalFlutter_Window_Destroy(int64_t engine_id, void* window) {

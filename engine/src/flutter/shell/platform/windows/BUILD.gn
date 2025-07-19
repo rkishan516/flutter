@@ -93,6 +93,8 @@ source_set("flutter_windows_source") {
     "host_window.h",
     "host_window_dialog.cc",
     "host_window_dialog.h",
+    "host_window_overlay.cc",
+    "host_window_overlay.h",
     "host_window_regular.cc",
     "host_window_regular.h",
     "keyboard_handler_base.h",

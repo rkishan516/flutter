@@ -202,6 +202,7 @@ class _ActiveWindowsTable extends StatelessWidget {
             controller: controller.controller as DialogWindowController);
         break;
       case WindowArchetype.tooltip:
+      case WindowArchetype.overlay:
     }
   }
 }
@@ -217,6 +218,7 @@ class _WindowCreatorCard extends StatelessWidget {
   final WindowSettings windowSettings;
 
   static final tooltipKey = GlobalKey();
+  static final overlayKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
@@ -282,11 +284,12 @@ class _WindowCreatorCard extends StatelessWidget {
                   onPressed: windowManagerModel.selected == null
                       ? null
                       : () {
-                          final renderBox =
-                              tooltipKey.currentContext?.findRenderObject() as RenderBox;
+                          final renderBox = tooltipKey.currentContext
+                              ?.findRenderObject() as RenderBox;
                           final transform = renderBox.getTransformTo(null);
                           final rect = Offset.zero & renderBox.size;
-                          final globalRect = MatrixUtils.transformRect(transform, rect);
+                          final globalRect =
+                              MatrixUtils.transformRect(transform, rect);
                           final UniqueKey key = UniqueKey();
                           windowManagerModel.add(KeyedWindowController(
                               key: key,
@@ -301,7 +304,8 @@ class _WindowCreatorCard extends StatelessWidget {
                                     }),
 
                                 delegate: _TooltipWindowControllerDelegate(
-                                  onDestroyed: () => windowManagerModel.remove(key),
+                                  onDestroyed: () =>
+                                      windowManagerModel.remove(key),
                                 ),
                                 // title: "Popup",
                                 parent: windowManagerModel.selected!.rootView,
@@ -314,6 +318,36 @@ class _WindowCreatorCard extends StatelessWidget {
                       : 'Tooltip (requires parent)'),
                 ),
                 const SizedBox(height: 8),
+                OutlinedButton(
+                  key: overlayKey,
+                  onPressed: () async {
+                    final UniqueKey key = UniqueKey();
+                    final renderBox = overlayKey.currentContext
+                        ?.findRenderObject() as RenderBox;
+                    final transform = renderBox.getTransformTo(null);
+                    final rect = Offset.zero & renderBox.size;
+                    final globalRect =
+                        MatrixUtils.transformRect(transform, rect);
+                    windowManagerModel.add(KeyedWindowController(
+                        key: key,
+                        controller: OverlayWindowController(
+                          delegate: _OverlayWindowControllerDelegate(
+                            onDestroyed: () => windowManagerModel.remove(key),
+                          ),
+                          anchorRect: globalRect,
+                          positioner: WindowPositioner(
+                              childAnchor: WindowPositionerAnchor.left,
+                              parentAnchor: WindowPositionerAnchor.right,
+                              offset: const Offset(10, 0),
+                              constraintAdjustment: {
+                                // WindowPositionerConstraintAdjustment.flipX,
+                              }),
+                          parent: windowManagerModel.selected!.rootView,
+                        )));
+                  },
+                  child: const Text('Overlay'),
+                ),
+                const SizedBox(height: 8),
                 Container(
                   alignment: Alignment.bottomRight,
                   child: TextButton(
@@ -324,7 +358,6 @@ class _WindowCreatorCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-
               ],
             ),
           ],
@@ -360,6 +393,18 @@ class _DialogWindowControllerDelegate extends DialogWindowControllerDelegate {
 
 class _TooltipWindowControllerDelegate extends TooltipWindowControllerDelegate {
   _TooltipWindowControllerDelegate({required this.onDestroyed});
+
+  @override
+  void onWindowDestroyed() {
+    onDestroyed();
+    super.onWindowDestroyed();
+  }
+
+  final VoidCallback onDestroyed;
+}
+
+class _OverlayWindowControllerDelegate extends OverlayWindowControllerDelegate {
+  _OverlayWindowControllerDelegate({required this.onDestroyed});
 
   @override
   void onWindowDestroyed() {
