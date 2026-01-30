@@ -151,7 +151,6 @@ class TestsCrossImportChecker {
     'packages/flutter/test/widgets/sliver_main_axis_group_test.dart',
     'packages/flutter/test/widgets/color_filter_test.dart',
     'packages/flutter/test/widgets/semantics_merge_test.dart',
-    'packages/flutter/test/widgets/modal_barrier_test.dart',
     'packages/flutter/test/widgets/sliver_semantics_test.dart',
     'packages/flutter/test/widgets/slivers_padding_test.dart',
     'packages/flutter/test/widgets/sliver_constraints_test.dart',
